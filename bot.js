@@ -53,15 +53,16 @@ function askSourceLanguage(chatId) {
     });
 }
 
-function askTargetLanguage(chatId) {
+// Теперь эта функция принимает fromLang и убирает его из списка
+function askTargetLanguage(chatId, fromLang) {
+    // Фильтруем языки: оставляем только те, которые НЕ равны исходному
+    const targetLanguages = Object.keys(LANGUAGES).filter(key => LANGUAGES[key] !== fromLang);
+    
     bot.sendMessage(chatId, '🎯 На какой язык нужно перевести?', {
         reply_markup: {
-            inline_keyboard: [
-                [{ text: 'Русский', callback_data: 'tgt_ru' }],
-                [{ text: 'Английский', callback_data: 'tgt_en' }],
-                [{ text: 'Немецкий', callback_data: 'tgt_de' }],
-                [{ text: 'Испанский', callback_data: 'tgt_es' }]
-            ]
+            inline_keyboard: targetLanguages.map(key => [
+                { text: LANGUAGES[key], callback_data: `tgt_${key}` }
+            ])
         }
     });
 }
@@ -93,7 +94,7 @@ bot.on('callback_query', async (query) => {
     if (data.startsWith('src_')) {
         state.fromLang = LANGUAGES[data.split('_')[1]];
         state.step = 2;
-        askTargetLanguage(chatId);
+        askTargetLanguage(chatId, state.fromLang); // Передаём исходный язык
     } else if (data.startsWith('tgt_')) {
         state.toLang = LANGUAGES[data.split('_')[1]];
         state.step = 3;
@@ -130,7 +131,7 @@ bot.on('message', async (msg) => {
 
         // Отправляем запрос к OpenRouter через axios
         const response = await openrouterApi.post('/chat/completions', {
-            model: "nvidia/nemotron-3.5-content-safety:free",
+            model: "meta-llama/llama-3.1-8b-instruct:free", // Заменяем на нормальную модель
             messages: [
                 { role: "user", content: prompt }
             ]
