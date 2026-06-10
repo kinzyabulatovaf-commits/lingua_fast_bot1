@@ -1,5 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { OpenRouter } = require("@openrouter/sdk");
+const axios = require('axios');
 const express = require('express');
 require('dotenv').config();
 
@@ -9,9 +9,17 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('LinguaFast Bot is running!'));
 app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
 
-// --- Настройка Бота и OpenRouter ---
+// --- Настройка Бота ---
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-const openrouter = new OpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
+
+// Настраиваем axios для работы с OpenRouter API
+const openrouterApi = axios.create({
+  baseURL: 'https://openrouter.ai/api/v1',
+  headers: {
+    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    'Content-Type': 'application/json'
+  }
+});
 
 const userStates = {}; // Хранилище состояний пользователей
 
@@ -28,7 +36,7 @@ const STYLES = ['Формальный', 'Нейтральный', 'Разгов�
 // Функция команды /start
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    userStates[chatId] = { step: 1 }; // Начинаем с шага 1
+    userStates[chatId] = { step: 1 };
     askSourceLanguage(chatId);
 });
 
@@ -100,7 +108,7 @@ bot.on('callback_query', async (query) => {
         bot.sendMessage(chatId, '✅ Отлично! Теперь просто отправьте мне текст, который нужно перевести.');
     }
     
-    bot.answerCallbackQuery(query.id); // Убираем "часики" на кнопках
+    bot.answerCallbackQuery(query.id);
 });
 
 // Обработка текстовых сообщений (сам перевод)
@@ -120,24 +128,17 @@ bot.on('message', async (msg) => {
 Стиль общения: ${state.style}.
 Текст для перевода: "${text}"`;
 
-        // Используем стриминг как в твоем примере
-        const stream = await openrouter.chat.send({
+        // Отправляем запрос к OpenRouter через axios
+        const response = await openrouterApi.post('/chat/completions', {
             model: "nvidia/nemotron-3.5-content-safety:free",
             messages: [
                 { role: "user", content: prompt }
-            ],
-            stream: true
+            ]
         });
 
-        let response = "";
-        for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content;
-            if (content) {
-                response += content;
-            }
-        }
+        const translatedText = response.data.choices[0].message.content;
         
-        bot.sendMessage(chatId, `✅ *Готово!*\n\n${response}`, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, `✅ *Готово!*\n\n${translatedText}`, { parse_mode: 'Markdown' });
         
     } catch (error) {
         console.error(error);
