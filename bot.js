@@ -131,7 +131,7 @@ bot.on('message', async (msg) => {
 
         // Отправляем запрос к OpenRouter через axios
         const response = await openrouterApi.post('/chat/completions', {
-            model: "meta-llama/llama-3.1-8b-instruct:free", // Заменяем на нормальную модель
+            model: "google/gemma-4-31b-it:free", // Заменяем на нормальную модель
             messages: [
                 { role: "user", content: prompt }
             ]
